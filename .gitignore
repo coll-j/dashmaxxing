@@ -1,0 +1,35 @@
+# Credentials & Secrets
+.env
+.env.*
+*.json
+!package.json
+!tsconfig.json
+!package-lock.json
+# Specifically ignore the Google Service Account JSON
+jek-personal-playground-*.json
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Node / Next.js (Frontend)
+node_modules/
+.next/
+out/
+build/
+.vercel
+*.tsbuildinfo
+npm-debug.log*
+
+# Python & FastAPI (Backend)
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+alembic.ini
+
+# Docker / Local DB Data
+postgres_data/
+redis_data/
