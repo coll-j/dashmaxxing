@@ -47,7 +47,7 @@ async def chat_with_ai(request: ChatRequest):
     
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-pro",
+            model_name="gemini-flash-latest",
             system_instruction=SYSTEM_PROMPT
         )
         
@@ -81,7 +81,7 @@ async def generate_dashboard(request: GenerateRequest):
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured on server.")
         
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
+        model_name="gemini-flash-latest",
         system_instruction="You are an expert who outputs ONLY valid JSON representing a dashboard layout. Schema: {charts: [{id: string, title: string, type: 'line'|'bar'|'pie', sql_query: string, layout: {w: int, h: int, x: int, y: int}}]}"
     )
     
