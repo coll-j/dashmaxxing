@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from ..core.db import get_db
-from ..models.org import Org
-from ..models.user import User
+from core.db import get_db
+from models.org import Org
+from models.user import User
 from pydantic import BaseModel
 import re
 
