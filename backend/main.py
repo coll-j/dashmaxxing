@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api import auth, orgs, sources, ai
+from api import auth, orgs, sources, ai, dashboards
 from core.db import engine
 from models.base import Base
 
@@ -18,6 +18,7 @@ app.include_router(auth.router)
 app.include_router(orgs.router)
 app.include_router(sources.router)
 app.include_router(ai.router)
+app.include_router(dashboards.router)
 
 @app.on_event("startup")
 async def startup():

@@ -1,8 +1,13 @@
 import json
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
+from sqlalchemy.ext.asyncio import AsyncSession
+from core.db import get_db
+from models.dashboard import Dashboard
+from models.chart import Chart
+import uuid
 import google.generativeai as genai
 
 # Initialize key if present (users will set this in .env or environment)
@@ -23,6 +28,8 @@ class ChatRequest(BaseModel):
 class GenerateRequest(BaseModel):
     history: List[ChatMessage]
     schema_context: dict
+    org_id: int
+    source_id: int
 
 SYSTEM_PROMPT = """
 You are Dashmaxxing, an expert Data Analyst AI. 
@@ -76,26 +83,55 @@ async def chat_with_ai(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate")
-async def generate_dashboard(request: GenerateRequest):
+async def generate_dashboard(request: GenerateRequest, db: AsyncSession = Depends(get_db)):
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured on server.")
         
     model = genai.GenerativeModel(
         model_name="gemini-flash-latest",
-        system_instruction="You are an expert who outputs ONLY valid JSON representing a dashboard layout. Schema: {charts: [{id: string, title: string, type: 'line'|'bar'|'pie', sql_query: string, layout: {w: int, h: int, x: int, y: int}}]}"
+        system_instruction="You are an expert who outputs ONLY valid JSON representing a dashboard layout. Schema: {dashboard_name: string, charts: [{title: string, type: 'line'|'bar'|'pie', sql_query: string, layout: {w: int, h: int, x: int, y: int}}]}"
     )
     
     formatted_history = ""
     for msg in request.history:
          formatted_history += f"{msg.role.upper()}: {msg.parts}\n"
          
-    prompt = f"Based on this SCHEMA context:\n{json.dumps(request.schema_context)}\n\nAnd this interaction history:\n{formatted_history}\n\nGenerate the JSON for the dashboard. Format it EXACTLY as the requested schema. Return NOTHING but the JSON."
+    prompt = f"Based on this SCHEMA context:\n{json.dumps(request.schema_context)}\n\nAnd this interaction history:\n{formatted_history}\n\nGenerate the JSON for the dashboard. Format it EXACTLY as the requested schema. Use the interaction history to decide on a good 'dashboard_name'. Return NOTHING but the JSON."
     
     response = model.generate_content(prompt)
     
     try:
         raw = response.text.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(raw)
-        return parsed
+        
+        # 1. Create Dashboard
+        dashboard_name = parsed.get("dashboard_name", "AI Generated Dashboard")
+        dashboard_slug = f"{dashboard_name.lower().replace(' ', '-')}-{str(uuid.uuid4())[:8]}"
+        
+        new_dashboard = Dashboard(
+            name=dashboard_name,
+            slug=dashboard_slug,
+            org_id=request.org_id
+        )
+        db.add(new_dashboard)
+        await db.flush() # Get the ID
+        
+        # 2. Create Charts
+        for chart_data in parsed.get("charts", []):
+            new_chart = Chart(
+                title=chart_data["title"],
+                type=chart_data["type"],
+                sql_query=chart_data["sql_query"],
+                layout=chart_data["layout"],
+                dashboard_id=new_dashboard.id,
+                source_id=request.source_id
+            )
+            db.add(new_chart)
+        
+        await db.commit()
+        return {"dashboard_id": new_dashboard.id, "slug": new_dashboard.slug}
+
     except Exception as e:
-        return {"error": "Failed to parse JSON from AI", "raw": response.text}
+        import traceback
+        traceback.print_exc()
+        return {"error": "Failed to process AI response", "detail": str(e)}

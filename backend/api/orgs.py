@@ -13,6 +13,10 @@ class OrgCreate(BaseModel):
     name: str
     user_id: int 
 
+class OrgJoin(BaseModel):
+    user_id: int
+    org_id: int
+
 @router.post("/")
 async def create_org(org_data: OrgCreate, db: AsyncSession = Depends(get_db)):
     # Generate URL-safe slug
@@ -31,3 +35,19 @@ async def create_org(org_data: OrgCreate, db: AsyncSession = Depends(get_db)):
         await db.commit()
 
     return org
+
+@router.post("/join")
+async def join_org(join_data: OrgJoin, db: AsyncSession = Depends(get_db)):
+    org = await db.get(Org, join_data.org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+        
+    user = await db.get(User, join_data.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.org_id = org.id
+    user.role = "Member"
+    await db.commit()
+    
+    return {"status": "success", "org": {"id": org.id, "name": org.name}}

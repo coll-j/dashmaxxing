@@ -46,3 +46,12 @@ class PostgresConnector(BaseConnector):
             return list(schema_map.values())
         finally:
             await conn.close()
+
+    async def fetch_data(self, query: str) -> List[Dict[str, Any]]:
+        conn = await self._get_conn()
+        try:
+            rows = await conn.fetch(query)
+            # Convert asyncpg.Record objects to standard dictionaries for JSON serialization
+            return [dict(row) for row in rows]
+        finally:
+            await conn.close()
